@@ -1,6 +1,6 @@
-# Windmill infrastructure automation examples
+# VMware vRA replacement examples for Windmill
 
-Infrastructure automation in [Windmill](https://www.windmill.dev): a VMware vRA catalog item and its vRO workflow rebuilt as a Windmill flow, plus the Day 2 jobs that usually sit next to it.
+Infrastructure automation in [Windmill](https://www.windmill.dev): a VMware vRA catalog item and its vRO workflow rebuilt as a Windmill flow, plus the Day 2 jobs that usually sit next to it. Everything runs against vSphere with OpenTofu, Ansible and ServiceNow, which stay where they are.
 
 Companion repository to:
 
