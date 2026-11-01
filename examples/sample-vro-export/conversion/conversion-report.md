@@ -1,6 +1,6 @@
 # vRO conversion report
 
-Source: `examples/sample-vro-export/` (Build Tools xml layout). Inventory: `vro/inventory.md`, `vro/inventory.json`. Extracted sources: `vro/src/`.
+Source: `examples/sample-vro-export/` (Build Tools xml layout). Produced by running the `vro-to-windmill` skill on this export. Inventory: `inventory.md`, `inventory.json`. Extracted sources: `src/`. Converted Windmill code: `f/vro/` at the repository root.
 
 Inventory counts: 1 workflow, 2 actions, 1 configuration element. Verdicts: retire 0, merge 0, wrapper 0, rebuild 3 (1 workflow, 2 actions), convert 0. No `--runs` file was given, so nothing could be marked retire.
 Plugin dependencies: `VC:VirtualMachine` (3 uses), `VcPlugin` (1 use), replaced by one shared helper, `f/vro/lib/vsphere.ts`.
