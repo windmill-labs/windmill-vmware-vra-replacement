@@ -1,0 +1,97 @@
+---
+# Windmill header: inputs, files and dependencies. Ansible never sees this document.
+extra_vars:
+  host_ip:
+    type: string
+    description: IP address returned by the provisioning step
+  hostname:
+    type: string
+  env_name:
+    type: string
+    default: dev
+  ssh_user:
+    type: string
+    default: ubuntu
+    description: User baked into the VM template, with passwordless sudo
+files:
+  # Secret variable holding the private key that matches the template's authorized_keys.
+  # Keep a trailing newline at the end of the key.
+  - variable: f/infra/ssh_private_key
+    target: ./ssh_key
+    mode: '0600'
+dependencies:
+  galaxy:
+    collections:
+      - name: community.general
+      - name: ansible.posix
+---
+# Play 1: the VM did not exist when the job was queued, so build the inventory at run time.
+- name: Register the new VM
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Add the VM to an in-memory inventory
+      ansible.builtin.add_host:
+        name: "{{ hostname }}"
+        groups: new_vm
+        ansible_host: "{{ host_ip }}"
+        ansible_user: "{{ ssh_user }}"
+        ansible_ssh_private_key_file: ssh_key
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=accept-new"
+
+# Play 2: the baseline every VM gets, whatever team requested it.
+- name: Apply the baseline
+  hosts: new_vm
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Wait for SSH after guest customization reboots the VM
+      ansible.builtin.wait_for_connection:
+        timeout: 600
+
+    - name: Gather facts
+      ansible.builtin.setup:
+
+    - name: Set the hostname
+      ansible.builtin.hostname:
+        name: "{{ hostname }}"
+
+    - name: Install baseline packages
+      ansible.builtin.package:
+        name:
+          - chrony
+          - curl
+          - jq
+        state: present
+
+    - name: Enable time sync
+      ansible.builtin.service:
+        name: "{{ 'chrony' if ansible_os_family == 'Debian' else 'chronyd' }}"
+        state: started
+        enabled: true
+
+    - name: Enable unattended security upgrades (Debian family)
+      ansible.builtin.package:
+        name: unattended-upgrades
+        state: present
+      when: ansible_os_family == 'Debian'
+
+    - name: Tag the host with its environment
+      ansible.builtin.copy:
+        dest: /etc/windmill-managed
+        content: |
+          environment={{ env_name }}
+          provisioned_by_job={{ lookup('env', 'WM_JOB_ID') }}
+        mode: '0644'
+
+# Play 3: hand a structured result back to the flow.
+- name: Report
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Write result.json
+      ansible.builtin.copy:
+        content: "{{ {'hostname': hostname, 'host_ip': host_ip, 'os': hostvars[hostname]['ansible_distribution'] ~ ' ' ~ hostvars[hostname]['ansible_distribution_version'], 'configured': true} | to_json }}"
+        dest: result.json

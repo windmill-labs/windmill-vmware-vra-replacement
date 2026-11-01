@@ -1,0 +1,262 @@
+summary: 'Provision a vSphere VM: the vRA catalog item rebuilt as a Windmill flow'
+description: >
+  One flow replaces a vRA catalog item, its approval policy and the vRO
+
+  workflow behind it.
+
+    plan            size and OS -> CPU, memory, disk, template; decide if approval is needed
+    approval        suspends for prod or large requests, skipped otherwise
+    provision       OpenTofu clones the template on vSphere (state in Postgres)
+    configure       Ansible applies the baseline over SSH
+    close_ticket    work note + state on the ServiceNow request, if there is one
+    failure         destroys a half-built VM and notes the error on the ticket
+
+  Start it from the generated form (that form is the catalog item), from the
+
+  API, or from a webhook / HTTP route that ServiceNow calls: the preprocessor
+
+  maps the request payload to the inputs. Set dry_run to walk the whole flow
+
+  without touching vSphere, the VM or ServiceNow.
+value:
+  modules:
+    - id: plan
+      summary: Resolve size and OS into a VM spec
+      value:
+        type: rawscript
+        content: '!inline plan.ts'
+        input_transforms:
+          environment:
+            type: javascript
+            expr: flow_input.environment ?? 'dev'
+          os:
+            type: javascript
+            expr: flow_input.os ?? 'ubuntu-24.04'
+          size:
+            type: javascript
+            expr: flow_input.size ?? 'small'
+          vm_name:
+            type: javascript
+            expr: flow_input.vm_name
+        lock: '!inline plan.lock'
+        language: bun
+    - id: approval
+      summary: Wait for approval (prod or large only)
+      value:
+        type: rawscript
+        content: '!inline request_approval.ts'
+        input_transforms:
+          plan:
+            type: javascript
+            expr: results.plan
+          ticket:
+            type: javascript
+            expr: flow_input.ticket ?? ''
+        lock: '!inline request_approval.lock'
+        language: bun
+      skip_if:
+        expr: '!results.plan.needs_approval'
+      suspend:
+        required_events: 1
+        timeout: 86400
+    - id: provision
+      summary: Clone the VM on vSphere with OpenTofu
+      value:
+        type: script
+        input_transforms:
+          action:
+            type: static
+            value: apply
+          cpus:
+            type: javascript
+            expr: results.plan.cpus
+          disk_gb:
+            type: javascript
+            expr: results.plan.disk_gb
+          dry_run:
+            type: javascript
+            expr: flow_input.dry_run === true
+          memory_mb:
+            type: javascript
+            expr: results.plan.memory_mb
+          template:
+            type: javascript
+            expr: results.plan.template
+          tf_state:
+            type: static
+            value: $res:f/infra/tf_state
+          vm_name:
+            type: javascript
+            expr: results.plan.vm_name
+          vsphere:
+            type: static
+            value: $res:f/infra/vsphere
+        path: f/infra/tofu_vm
+      retry:
+        constant:
+          attempts: 1
+          seconds: 30
+    - id: configure
+      summary: Apply the Ansible baseline
+      value:
+        type: script
+        input_transforms:
+          env_name:
+            type: javascript
+            expr: results.plan.environment
+          host_ip:
+            type: javascript
+            expr: results.provision.ip_address
+          hostname:
+            type: javascript
+            expr: results.plan.vm_name
+          ssh_user:
+            type: javascript
+            expr: results.plan.ssh_user
+        path: f/infra/configure_baseline
+      retry:
+        constant:
+          attempts: 2
+          seconds: 60
+      skip_if:
+        expr: flow_input.dry_run === true
+    - id: close_ticket
+      summary: Close the ServiceNow request
+      value:
+        type: script
+        input_transforms:
+          dry_run:
+            type: javascript
+            expr: flow_input.dry_run === true
+          number:
+            type: javascript
+            expr: flow_input.ticket ?? ''
+          servicenow:
+            type: static
+            value: $res:f/infra/servicenow
+          state:
+            type: static
+            value: '3'
+          table:
+            type: static
+            value: sc_req_item
+          work_notes:
+            type: javascript
+            expr: '`VM ${results.plan.vm_name} is ready at ${results.provision.ip_address}
+              (${results.plan.cpus} vCPU, ${results.plan.memory_mb / 1024} GB
+              RAM). Provisioned by Windmill.`'
+        path: f/infra/servicenow_update
+      skip_if:
+        expr: '!flow_input.ticket'
+    - id: summary
+      summary: Return what was built
+      value:
+        type: rawscript
+        content: '!inline summary.ts'
+        input_transforms:
+          configure:
+            type: javascript
+            expr: 'flow_input.dry_run ? null : results.configure'
+          dry_run:
+            type: javascript
+            expr: flow_input.dry_run === true
+          plan:
+            type: javascript
+            expr: results.plan
+          provision:
+            type: javascript
+            expr: results.provision
+        lock: '!inline summary.lock'
+        language: bun
+  failure_module:
+    id: failure
+    summary: Roll back and report on the ticket
+    value:
+      type: rawscript
+      content: '!inline on_failure.ts'
+      input_transforms:
+        dry_run:
+          type: javascript
+          expr: flow_input.dry_run === true
+        message:
+          type: javascript
+          expr: error.message
+        rollback_on_failure:
+          type: javascript
+          expr: flow_input.rollback_on_failure ?? true
+        step_id:
+          type: javascript
+          expr: error.step_id
+        ticket:
+          type: javascript
+          expr: flow_input.ticket ?? ''
+        vm_name:
+          type: javascript
+          expr: flow_input.vm_name
+      lock: '!inline on_failure.lock'
+      language: bun
+  preprocessor_module:
+    id: preprocessor
+    summary: Map a ServiceNow request payload to the flow inputs
+    value:
+      type: rawscript
+      content: '!inline preprocessor.ts'
+      input_transforms: {}
+      lock: '!inline preprocessor.lock'
+      language: bun
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  order:
+    - vm_name
+    - size
+    - os
+    - environment
+    - ticket
+    - rollback_on_failure
+    - dry_run
+  properties:
+    dry_run:
+      type: boolean
+      description: Walk the flow without calling vSphere, the VM or ServiceNow
+      default: false
+    environment:
+      type: string
+      description: prod requests need approval
+      default: dev
+      enum:
+        - dev
+        - staging
+        - prod
+    os:
+      type: string
+      default: ubuntu-24.04
+      enum:
+        - ubuntu-24.04
+        - rhel-9
+    rollback_on_failure:
+      type: boolean
+      description: Destroy the VM if a step after provisioning fails
+      default: true
+    size:
+      type: string
+      description: small 2 vCPU / 4 GB, medium 4 vCPU / 8 GB, large 8 vCPU / 16 GB
+        (needs approval)
+      default: small
+      enum:
+        - small
+        - medium
+        - large
+    ticket:
+      type: string
+      description: ServiceNow request item number (RITM...), optional
+      default: ''
+    vm_name:
+      type: string
+      description: Lowercase letters, digits and dashes, e.g. app-web-01
+      pattern: ^[a-z][a-z0-9-]{2,30}$
+  required:
+    - vm_name
+    - size
+    - os
+    - environment

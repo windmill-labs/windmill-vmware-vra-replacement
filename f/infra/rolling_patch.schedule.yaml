@@ -1,0 +1,16 @@
+schedule: 0 0 3 * * 2
+timezone: Etc/UTC
+enabled: false
+script_path: f/infra/rolling_patch
+is_flow: true
+args:
+  hosts:
+    - dev-web-01.corp.local
+    - dev-web-02.corp.local
+    - dev-api-01.corp.local
+  batch_size: 2
+  canary: true
+  reboot_if_required: true
+  ssh_user: ubuntu
+  require_approval: false
+  dry_run: false

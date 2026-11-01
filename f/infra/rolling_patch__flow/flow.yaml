@@ -1,0 +1,136 @@
+summary: Patch a server fleet in batches with Ansible, stopping on the first
+  failed batch
+description: |
+  Rolling OS patching. The first host is patched alone as a canary, then the
+  rest in batches of batch_size, one batch at a time. A failed or unreachable
+  host fails its batch, and the loop stops before the next one, so a bad
+  update never reaches the whole fleet. Requires approval when
+  require_approval is set (the schedule example leaves it off for dev).
+value:
+  modules:
+    - id: make_batches
+      summary: Split the fleet into a canary and batches
+      value:
+        type: rawscript
+        content: '!inline make_batches.ts'
+        input_transforms:
+          batch_size:
+            type: javascript
+            expr: flow_input.batch_size ?? 5
+          canary:
+            type: javascript
+            expr: flow_input.canary ?? true
+          hosts:
+            type: javascript
+            expr: flow_input.hosts
+        lock: '!inline make_batches.lock'
+        language: bun
+    - id: approval
+      summary: Approve the patch window
+      value:
+        type: identity
+      skip_if:
+        expr: flow_input.require_approval === false
+      suspend:
+        required_events: 1
+        timeout: 86400
+    - id: patch_batches
+      summary: Patch one batch at a time
+      value:
+        type: forloopflow
+        modules:
+          - id: patch_batch
+            summary: Patch this batch
+            value:
+              type: branchone
+              branches:
+                - summary: Dry run
+                  modules:
+                    - id: dry_run_batch
+                      value:
+                        type: rawscript
+                        content: '!inline dry_run_batch.ts'
+                        input_transforms:
+                          target_hosts:
+                            type: javascript
+                            expr: flow_input.iter.value
+                        lock: '!inline dry_run_batch.lock'
+                        language: bun
+                  expr: flow_input.dry_run === true
+                  parallel: true
+                  skip_failure: false
+              default:
+                - id: run_playbook
+                  value:
+                    type: script
+                    input_transforms:
+                      reboot_if_required:
+                        type: javascript
+                        expr: flow_input.reboot_if_required ?? true
+                      ssh_user:
+                        type: javascript
+                        expr: flow_input.ssh_user ?? 'ubuntu'
+                      target_hosts:
+                        type: javascript
+                        expr: flow_input.iter.value
+                    path: f/infra/patch_hosts
+        iterator:
+          type: javascript
+          expr: results.make_batches.batches
+        parallel: false
+        skip_failures: false
+    - id: report
+      summary: Summarize the run
+      value:
+        type: rawscript
+        content: '!inline report.ts'
+        input_transforms:
+          batches:
+            type: javascript
+            expr: results.make_batches.batches
+          dry_run:
+            type: javascript
+            expr: flow_input.dry_run === true
+          results:
+            type: javascript
+            expr: results.patch_batches
+        lock: '!inline report.lock'
+        language: bun
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  order:
+    - hosts
+    - batch_size
+    - canary
+    - reboot_if_required
+    - ssh_user
+    - require_approval
+    - dry_run
+  properties:
+    batch_size:
+      type: integer
+      default: 5
+    canary:
+      type: boolean
+      description: Patch the first host alone before the batches
+      default: true
+    dry_run:
+      type: boolean
+      default: false
+    hosts:
+      type: array
+      description: Hostnames or IPs reachable over SSH from the worker
+      items:
+        type: string
+    reboot_if_required:
+      type: boolean
+      default: true
+    require_approval:
+      type: boolean
+      default: true
+    ssh_user:
+      type: string
+      default: ubuntu
+  required:
+    - hosts

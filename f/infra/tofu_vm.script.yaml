@@ -1,0 +1,57 @@
+summary: 'Create or destroy a vSphere VM with OpenTofu (state in Postgres)'
+description: ''
+lock: '!inline f/infra/tofu_vm.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    action:
+      type: string
+      description: ''
+      default: null
+      enum:
+        - apply
+        - destroy
+      originalType: enum
+    cpus:
+      type: integer
+      description: ''
+      default: 2
+    disk_gb:
+      type: integer
+      description: ''
+      default: 40
+    dry_run:
+      type: boolean
+      description: ''
+      default: false
+    memory_mb:
+      type: integer
+      description: ''
+      default: 4096
+    template:
+      type: string
+      description: ''
+      default: ubuntu-24.04-template
+      originalType: string
+    tf_state:
+      type: object
+      description: ''
+      default: null
+      format: resource-postgresql
+    vm_name:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    vsphere:
+      type: object
+      description: ''
+      default: null
+      format: resource-c_vsphere
+  required:
+    - action
+    - vm_name
+    - vsphere
+    - tf_state

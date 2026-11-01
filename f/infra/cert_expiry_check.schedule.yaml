@@ -1,0 +1,10 @@
+schedule: 0 0 7 * * *
+timezone: Etc/UTC
+enabled: false
+script_path: f/infra/cert_expiry_check
+is_flow: false
+args:
+  endpoints:
+    - vcenter.corp.local:443
+    - netbox.corp.local:443
+  warn_days: 21

@@ -1,0 +1,28 @@
+summary: 'Delete vSphere snapshots older than N days'
+description: ''
+lock: '!inline f/infra/snapshot_sweeper.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    dry_run:
+      type: boolean
+      description: ''
+      default: true
+    keep_if_name_contains:
+      type: string
+      description: ''
+      default: keep
+      originalType: string
+    max_age_days:
+      type: integer
+      description: ''
+      default: 7
+    vsphere:
+      type: object
+      description: ''
+      default: null
+      format: resource-c_vsphere
+  required:
+    - vsphere
