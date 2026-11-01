@@ -1,0 +1,33 @@
+summary: 'List powered-off VMs by name prefix (vRO action ported to the vSphere REST API)'
+description: ''
+lock: '!inline f/infra/powered_off_vms.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    prefix:
+      type: string
+      description: ''
+      default: ''
+      originalType: string
+    vsphere:
+      type: object
+      description: ''
+      default: null
+      format: resource-c_vsphere
+      properties:
+        password:
+          type: string
+          description: ''
+          originalType: string
+        server:
+          type: string
+          description: ''
+          originalType: string
+        user:
+          type: string
+          description: ''
+          originalType: string
+  required:
+    - vsphere

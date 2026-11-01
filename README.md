@@ -23,6 +23,8 @@ It runs on the open source Community Edition; the [Enterprise Edition](https://w
 | `servicenow_update.ts` | Script | Work note and state change on any ServiceNow table, basic auth or OAuth. |
 | `snapshot_sweeper.py` | Script + schedule | Deletes vSphere snapshots older than N days (pyvmomi). Dry run by default. |
 | `cert_expiry_check.ts` | Script + schedule | Fails when a TLS certificate expires within N days, so the schedule error handler alerts. |
+| `powered_off_vms.ts` | Script | A typical vRO action ported to TypeScript on the vSphere Automation REST API. The original JavaScript is in the header comment. |
+| `powered_off_vms_powercli.ps1` | Script | The same action with PowerCLI. Windmill installs the module from the PowerShell Gallery on first run. |
 | `*.schedule.yaml` | Schedules | Nightly snapshot sweep, daily certificate check, weekly rolling patch. All ship disabled. |
 
 ```
@@ -50,6 +52,33 @@ provision_vm
 | Policy / scheduled workflow | Schedule (`*.schedule.yaml`) |
 | Event subscription | Webhook, HTTP route, Kafka, NATS, SQS, MQTT, Postgres CDC or email trigger with a preprocessor |
 | Package export | Git, synced with `wmill sync` |
+
+## Size your migration: `tools/vro_inventory.py`
+
+A standalone script (Python 3.9+, standard library only) that reads a vRO export and sorts every workflow and action into retire, merge, wrapper, rebuild or convert, with the plugin dependencies to replace.
+It runs on your machine, and nothing is sent anywhere.
+
+```bash
+# .package files from the vRO client or Build Tools for VMware Aria,
+# extracted package directories, or a Build Tools "xml" project
+python3 tools/vro_inventory.py exports/*.package --out inventory.md --json inventory.json
+
+# add run history to find workflows nobody ran in a year
+python3 tools/vro_inventory.py exports/ --runs runs.csv --since-days 365
+```
+
+`runs.csv` has a column `id` or `name`, and `last_run` (ISO 8601, empty when never run). You can build it from the vRO REST API (`GET /vco/api/workflows/{id}/executions`).
+
+| Verdict | Meaning | Becomes in Windmill |
+| --- | --- | --- |
+| retire | Not run in the window (needs `--runs`), or an action nothing references | Nothing |
+| merge | Same steps and logic as another workflow, ignoring literals | One flow with an input for what differs |
+| wrapper | One meaningful step | One script, or a direct call to the tool |
+| rebuild | Uses plugin objects (`VC:`, `AD:`, `REST:`, `VcPlugin`...) | Script on the target's API or SDK |
+| convert | Plain logic | TypeScript, Python or PowerShell script; flow when multi-step |
+
+Tested against the workflows and actions of VMware's [vRO plugin for Avi Load Balancer](https://github.com/vmware/vrealize-orchestrator-plugin-for-alb) (Build Tools xml layout) and synthetic `.package` files in vRO's on-disk format (`python3 tools/test_vro_inventory.py`).
+Element types it does not parse yet are skipped. If your export reports fewer elements than vRO shows, an issue with a redacted sample helps.
 
 ## Setup
 
