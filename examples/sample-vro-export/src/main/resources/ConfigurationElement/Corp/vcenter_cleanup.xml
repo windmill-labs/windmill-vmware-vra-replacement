@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<config-element id="8a1f0c2e-1111-4a6b-9a01-0000000000c1" version="1.0.0">
+  <display-name><![CDATA[vcenter_cleanup]]></display-name>
+  <atts>
+    <att name="vcHost" type="string" read-only="false"><value encoded="n"><![CDATA[vcenter.corp.local]]></value></att>
+    <att name="vcUser" type="string" read-only="false"><value encoded="n"><![CDATA[svc-vro@vsphere.local]]></value></att>
+    <att name="vcPassword" type="SecureString" read-only="false"/>
+    <att name="notifyEmail" type="string" read-only="false"><value encoded="n"><![CDATA[infra-team@corp.local]]></value></att>
+  </atts>
+</config-element>

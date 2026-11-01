@@ -157,6 +157,19 @@ class InventoryTest(unittest.TestCase):
         self.assertIn("| VC:VirtualMachine |", md)
         self.assertIn('"verdict": "merge"', js.read_text())
 
+    def test_extract_writes_readable_sources(self):
+        out = Path(self.tmp.name) / "src"
+        self.assertEqual(inv.main([str(self.pkg), "--out", str(Path(self.tmp.name) / "r.md"), "--extract", str(out)]), 0)
+        action = (out / "actions" / "com" / "corp" / "util" / "findVm.js").read_text()
+        self.assertIn("// returns: Array/VC:VirtualMachine", action)
+        self.assertIn("// param vmName: string", action)
+        self.assertIn("// verdict: rebuild", action)
+        self.assertIn("Server.findAllForType", action)
+        wf = __import__("json").loads((out / "workflows" / "com" / "corp" / "vm" / "Find_and_tag.json").read_text())
+        self.assertEqual(wf["items"][1]["action"], "com.corp.util/findVm")
+        cfg = __import__("json").loads((out / "configurations" / "com" / "corp" / "config" / "vcenter_settings.json").read_text())
+        self.assertEqual(cfg["attributes"]["password"], "SecureString")
+
     def test_extracted_directory_matches_package(self):
         extracted = Path(self.tmp.name) / "extracted"
         with zipfile.ZipFile(self.pkg) as z:

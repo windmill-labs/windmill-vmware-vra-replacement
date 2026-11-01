@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns2:workflow xmlns:ns2="http://vmware.com/vco/workflow" root-name="item1" object-name="workflow:name=generic" id="8a1f0c2e-1111-4a6b-9a01-0000000000w1" version="2.1.0" api-version="6.0.0" restartMode="1" resumeFromFailedMode="0">
+  <display-name>Clean up powered-off VMs</display-name>
+  <input>
+    <param name="prefix" type="string"/>
+    <param name="minDaysOff" type="number"/>
+  </input>
+  <output>
+    <param name="deleted" type="Array/string"/>
+  </output>
+  <attrib name="vms" type="Array/VC:VirtualMachine"/>
+  <attrib name="approved" type="boolean"/>
+  <attrib name="approver" type="string"/>
+  <workflow-item name="item0" type="end" end-mode="0"/>
+  <workflow-item name="item1" out-name="item2" type="task" script-module="com.corp.vm/getPoweredOffVms">
+    <display-name>getPoweredOffVms</display-name>
+    <script encoded="false"><![CDATA[actionResult = System.getModule("com.corp.vm").getPoweredOffVms(prefix,minDaysOff);]]></script>
+    <in-binding>
+      <bind name="prefix" type="string" export-name="prefix"/>
+      <bind name="minDaysOff" type="number" export-name="minDaysOff"/>
+    </in-binding>
+    <out-binding>
+      <bind name="actionResult" type="Array/VC:VirtualMachine" export-name="vms"/>
+    </out-binding>
+  </workflow-item>
+  <workflow-item name="item2" out-name="item3" alt-out-name="item0" type="custom-condition">
+    <display-name>Anything to delete?</display-name>
+    <script encoded="false"><![CDATA[return vms.length > 0;]]></script>
+    <in-binding>
+      <bind name="vms" type="Array/VC:VirtualMachine" export-name="vms"/>
+    </in-binding>
+  </workflow-item>
+  <workflow-item name="item3" out-name="item4" type="input">
+    <display-name>Approve deletion</display-name>
+    <in-binding>
+      <bind name="vms" type="Array/VC:VirtualMachine" export-name="vms"/>
+    </in-binding>
+    <out-binding>
+      <bind name="approved" type="boolean" export-name="approved"/>
+      <bind name="approver" type="string" export-name="approver"/>
+    </out-binding>
+  </workflow-item>
+  <workflow-item name="item4" out-name="item0" type="task">
+    <display-name>Delete approved VMs</display-name>
+    <script encoded="false"><![CDATA[deleted = [];
+if (!approved) {
+  System.warn("Deletion rejected by " + approver);
+} else {
+  for (var i in vms) {
+    deleted.push(System.getModule("com.corp.vm").deleteVm(vms[i]));
+  }
+}]]></script>
+    <in-binding>
+      <bind name="vms" type="Array/VC:VirtualMachine" export-name="vms"/>
+      <bind name="approved" type="boolean" export-name="approved"/>
+      <bind name="approver" type="string" export-name="approver"/>
+    </in-binding>
+    <out-binding>
+      <bind name="deleted" type="Array/string" export-name="deleted"/>
+    </out-binding>
+  </workflow-item>
+</ns2:workflow>

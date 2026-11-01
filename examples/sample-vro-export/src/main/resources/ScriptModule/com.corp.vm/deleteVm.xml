@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<dunes-script-module name="deleteVm" result-type="string" api-version="6.0.0" id="8a1f0c2e-1111-4a6b-9a01-0000000000a2" version="1.0.3" allowed-operations="vfe">
+  <description><![CDATA[Destroys a powered-off VM and returns its name.]]></description>
+  <param n="vm" t="VC:VirtualMachine"><![CDATA[VM to destroy]]></param>
+  <script encoded="false"><![CDATA[if (vm.runtime.powerState.value != "poweredOff") {
+  throw "Refusing to delete " + vm.name + ": it is not powered off";
+}
+var name = vm.name;
+var task = vm.destroy_Task();
+System.getModule("com.vmware.library.vc.basic").vim3WaitTaskEnd(task, false, 5);
+System.log("Deleted " + name);
+return name;]]></script>
+</dunes-script-module>

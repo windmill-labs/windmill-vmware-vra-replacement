@@ -66,6 +66,9 @@ class Element:
     action_refs: list[str] = field(default_factory=list)
     plugin_types: set[str] = field(default_factory=set)
     attributes: dict[str, str] = field(default_factory=dict)
+    params: list[dict] = field(default_factory=list)    # inputs, outputs, attributes with types
+    items: list[dict] = field(default_factory=list)     # workflow steps in document order
+    result_type: str = ""
     verdict: str = ""
     reason: str = ""
 
@@ -153,7 +156,31 @@ def element_from_xml(root: ET.Element, *, elem_id: str = "", elem_type: str = ""
             category=category,
             source=source,
         )
+        for kind, tag_name in (("input", "input"), ("output", "output")):
+            section = root.find(tag_name)
+            if section is not None:
+                for prm in section.iter("param"):
+                    el.params.append({"kind": kind, "name": prm.get("name", ""), "type": prm.get("type", "")})
+        for att in root.findall("attrib"):
+            el.params.append({"kind": "attribute", "name": att.get("name", ""), "type": att.get("type", ""),
+                              "value": (att.findtext("value") or "").strip()})
         for item in root.iter("workflow-item"):
+            script_node = item.find("script")
+            el.items.append({
+                "name": item.get("name", ""),
+                "type": item.get("type", ""),
+                "display_name": (item.findtext("display-name") or "").strip(),
+                "next": item.get("out-name", ""),
+                "alt_next": item.get("alt-out-name", ""),
+                "on_error": item.get("catch-name", ""),
+                "linked_workflow_id": item.get("linked-workflow-id", ""),
+                "action": item.get("script-module", ""),
+                "in": [{"name": b.get("name"), "type": b.get("type"), "from": b.get("export-name")}
+                       for b in item.findall("in-binding/bind")],
+                "out": [{"name": b.get("name"), "type": b.get("type"), "to": b.get("export-name")}
+                        for b in item.findall("out-binding/bind")],
+                "script": script_node.text if script_node is not None and script_node.text else "",
+            })
             el.item_types.append(item.get("type", "unknown"))
             script = item.find("script")
             if script is not None and (script.text or "").strip():
@@ -175,7 +202,11 @@ def element_from_xml(root: ET.Element, *, elem_id: str = "", elem_type: str = ""
             category=category,
             source=source,
             runtime=runtime,
+            result_type=root.get("result-type", ""),
         )
+        for prm in root.findall("param"):
+            el.params.append({"kind": "input", "name": prm.get("n", ""), "type": prm.get("t", ""),
+                              "description": (prm.text or "").strip()})
         script = root.findtext("script")
         if script and script.strip():
             el.scripts.append(script)
@@ -387,6 +418,49 @@ def report(elements: list[Element], runs_given: bool, since_days: int) -> str:
     return "\n".join(out) + "\n"
 
 
+# ---------------------------------------------------------------- extract
+
+EXT = {"javascript": "js", "node": "js", "python": "py", "powercli": "ps1", "powershell": "ps1"}
+COMMENT = {"js": "//", "py": "#", "ps1": "#"}
+
+
+def _safe(name: str) -> str:
+    return re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("_") or "unnamed"
+
+
+def extract(elements: list[Element], out: Path) -> int:
+    """Readable files per element. Actions keep their language; a header records
+    the signature and the verdict so the converter does not need the XML."""
+    n = 0
+    for e in elements:
+        cat = Path(*[_safe(c) for c in re.split(r"[./]", e.category) if c]) if e.category else Path("_uncategorized")
+        if e.type == "Action":
+            ext = EXT.get(e.runtime, "js")
+            c = COMMENT[ext]
+            path = out / "actions" / cat / f"{_safe(e.name)}.{ext}"
+            header = [f"{c} vRO action: {e.category}/{e.name}", f"{c} id: {e.id}", f"{c} runtime: {e.runtime}",
+                      f"{c} returns: {e.result_type or 'void'}"]
+            header += [f"{c} param {p['name']}: {p['type']}" + (f"  ({p['description']})" if p.get("description") else "") for p in e.params]
+            header += [f"{c} verdict: {e.verdict} ({e.reason})", ""]
+            body = e.scripts[0] if e.scripts else ""
+        elif e.type in ("Workflow", "ConfigurationElement"):
+            sub = "workflows" if e.type == "Workflow" else "configurations"
+            path = out / sub / cat / f"{_safe(e.name)}.json"
+            doc = {"type": e.type, "id": e.id, "name": e.name, "category": e.category, "verdict": e.verdict,
+                   "reason": e.reason, "plugin_types": sorted(e.plugin_types)}
+            if e.type == "Workflow":
+                doc.update({"params": e.params, "items": e.items, "action_refs": e.action_refs})
+            else:
+                doc["attributes"] = e.attributes
+            header, body = [], json.dumps(doc, indent=2)
+        else:
+            continue
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(header) + body + "\n")
+        n += 1
+    return n
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("paths", nargs="+", type=Path, help=".package files, extracted package directories or XML files")
@@ -394,6 +468,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--since-days", type=int, default=365, help="retire workflows not run in this many days (default 365)")
     ap.add_argument("--out", type=Path, help="write the Markdown report here (default stdout)")
     ap.add_argument("--json", type=Path, help="also write every element and its verdict as JSON")
+    ap.add_argument("--extract", type=Path, help="write each element as readable source (actions) or JSON (workflows, configuration elements) under this directory, for a person or a coding agent to convert")
     args = ap.parse_args(argv)
 
     elements: list[Element] = []
@@ -427,6 +502,9 @@ def main(argv: list[str] | None = None) -> int:
             d["steps"] = e.steps
             return d
         args.json.write_text(json.dumps([ser(e) for e in elements], indent=2))
+    if args.extract:
+        n = extract(elements, args.extract)
+        print(f"extracted {n} elements to {args.extract}", file=sys.stderr)
     return 0
 
 
