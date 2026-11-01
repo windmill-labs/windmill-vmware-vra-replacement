@@ -1,0 +1,84 @@
+---
+extra_vars:
+  target_hosts:
+    type: array
+    items:
+      type: string
+    description: Hostnames or IPs in this batch
+  reboot_if_required:
+    type: boolean
+    default: true
+  ssh_user:
+    type: string
+    default: ubuntu
+files:
+  - variable: f/infra/ssh_private_key
+    target: ./ssh_key
+    mode: '0600'
+dependencies:
+  galaxy:
+    collections:
+      - name: community.general
+---
+- name: Build the batch inventory
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Add each host of the batch
+      ansible.builtin.add_host:
+        name: "{{ item }}"
+        groups: batch
+        ansible_user: "{{ ssh_user }}"
+        ansible_ssh_private_key_file: ssh_key
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=accept-new"
+      loop: "{{ target_hosts }}"
+
+- name: Patch the batch
+  hosts: batch
+  become: true
+  # One unreachable or failed host fails the play, which fails the job,
+  # which stops the rolling loop before the next batch.
+  any_errors_fatal: true
+  tasks:
+    - name: Upgrade packages (Debian family)
+      ansible.builtin.apt:
+        upgrade: dist
+        update_cache: true
+      when: ansible_os_family == 'Debian'
+
+    - name: Upgrade packages (RedHat family)
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+      when: ansible_os_family == 'RedHat'
+
+    - name: Check whether a reboot is required (Debian family)
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_flag
+      when: ansible_os_family == 'Debian'
+
+    - name: Check whether a reboot is required (RedHat family)
+      ansible.builtin.command: needs-restarting -r
+      register: needs_restarting
+      changed_when: false
+      failed_when: false
+      when: ansible_os_family == 'RedHat'
+
+    - name: Reboot
+      ansible.builtin.reboot:
+        reboot_timeout: 900
+      when:
+        - reboot_if_required
+        - (reboot_flag.stat.exists | default(false)) or (needs_restarting.rc | default(0)) == 1
+
+- name: Report
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Write result.json
+      ansible.builtin.copy:
+        content: "{{ {'patched': target_hosts, 'count': target_hosts | length} | to_json }}"
+        dest: result.json

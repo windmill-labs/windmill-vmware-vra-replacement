@@ -1,0 +1,9 @@
+summary: 'Ansible baseline for a freshly provisioned VM'
+description: ''
+lock: '!inline f/infra/configure_baseline.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties: {}
+  required: []

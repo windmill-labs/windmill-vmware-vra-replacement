@@ -1,0 +1,22 @@
+{
+  "name": "c_vsphere",
+  "description": "vCenter connection and placement defaults used by the f/infra scripts",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "order": ["server", "user", "password", "allow_unverified_ssl", "datacenter", "cluster", "datastore", "network", "folder", "domain"],
+    "required": ["server", "user", "password", "datacenter", "cluster", "datastore", "network"],
+    "properties": {
+      "server": { "type": "string", "description": "vCenter hostname, without https://" },
+      "user": { "type": "string", "description": "Service account, e.g. svc-windmill@vsphere.local" },
+      "password": { "type": "string", "password": true },
+      "allow_unverified_ssl": { "type": "boolean", "default": false, "description": "Only for labs with self-signed vCenter certificates" },
+      "datacenter": { "type": "string" },
+      "cluster": { "type": "string", "description": "Compute cluster whose root resource pool receives the VM" },
+      "datastore": { "type": "string" },
+      "network": { "type": "string", "description": "Port group name" },
+      "folder": { "type": "string", "default": "", "description": "VM folder, relative to the datacenter. Empty means the root VM folder" },
+      "domain": { "type": "string", "default": "corp.local", "description": "DNS domain applied during guest customization" }
+    }
+  }
+}

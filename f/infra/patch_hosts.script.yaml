@@ -1,0 +1,9 @@
+summary: 'Ansible OS patching for one batch of hosts'
+description: ''
+lock: '!inline f/infra/patch_hosts.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties: {}
+  required: []

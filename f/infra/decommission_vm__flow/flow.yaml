@@ -1,0 +1,99 @@
+summary: Decommission a vSphere VM with approval and a ServiceNow trail
+description: |
+  Day 2 counterpart of provision_vm. Always asks for approval, destroys the VM
+  through the same OpenTofu state it was created with, then records the
+  outcome on the ticket. Set dry_run to walk it without touching anything.
+value:
+  modules:
+    - id: approval
+      summary: Wait for approval
+      value:
+        type: rawscript
+        content: '!inline request_approval.ts'
+        input_transforms:
+          reason:
+            type: javascript
+            expr: flow_input.reason ?? ''
+          ticket:
+            type: javascript
+            expr: flow_input.ticket ?? ''
+          vm_name:
+            type: javascript
+            expr: flow_input.vm_name
+        lock: '!inline request_approval.lock'
+        language: bun
+      suspend:
+        required_events: 1
+        timeout: 172800
+    - id: destroy
+      summary: Destroy the VM with OpenTofu
+      value:
+        type: script
+        input_transforms:
+          action:
+            type: static
+            value: destroy
+          dry_run:
+            type: javascript
+            expr: flow_input.dry_run === true
+          tf_state:
+            type: static
+            value: $res:f/infra/tf_state
+          vm_name:
+            type: javascript
+            expr: flow_input.vm_name
+          vsphere:
+            type: static
+            value: $res:f/infra/vsphere
+        path: f/infra/tofu_vm
+    - id: close_ticket
+      summary: Record the decommission on the ticket
+      value:
+        type: script
+        input_transforms:
+          dry_run:
+            type: javascript
+            expr: flow_input.dry_run === true
+          number:
+            type: javascript
+            expr: flow_input.ticket ?? ''
+          servicenow:
+            type: static
+            value: $res:f/infra/servicenow
+          state:
+            type: static
+            value: '3'
+          table:
+            type: static
+            value: sc_req_item
+          work_notes:
+            type: javascript
+            expr: '`VM ${flow_input.vm_name} destroyed. Reason: ${flow_input.reason ||
+              "n/a"}.`'
+        path: f/infra/servicenow_update
+      skip_if:
+        expr: '!flow_input.ticket'
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  order:
+    - vm_name
+    - reason
+    - ticket
+    - dry_run
+  properties:
+    dry_run:
+      type: boolean
+      default: false
+    reason:
+      type: string
+      default: ''
+    ticket:
+      type: string
+      description: ServiceNow request item number (RITM...), optional
+      default: ''
+    vm_name:
+      type: string
+      pattern: ^[a-z][a-z0-9-]{2,30}$
+  required:
+    - vm_name

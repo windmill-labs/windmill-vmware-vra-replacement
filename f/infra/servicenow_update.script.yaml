@@ -1,0 +1,58 @@
+summary: 'Add a work note and set the state of a ServiceNow record'
+description: ''
+lock: '!inline f/infra/servicenow_update.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    dry_run:
+      type: boolean
+      description: ''
+      default: false
+    number:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    servicenow:
+      type: object
+      description: ''
+      default: null
+      format: resource-servicenow
+      properties:
+        instance_url:
+          type: string
+          description: ''
+          originalType: string
+        password:
+          type: string
+          description: ''
+          originalType: string
+        token:
+          type: string
+          description: ''
+          originalType: string
+        username:
+          type: string
+          description: ''
+          originalType: string
+    state:
+      type: string
+      description: ''
+      default: ''
+      originalType: string
+    table:
+      type: string
+      description: ''
+      default: sc_req_item
+      originalType: string
+    work_notes:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+  required:
+    - servicenow
+    - number
+    - work_notes
