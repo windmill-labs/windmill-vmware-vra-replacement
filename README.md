@@ -80,6 +80,21 @@ python3 tools/vro_inventory.py exports/ --runs runs.csv --since-days 365
 Tested against the workflows and actions of VMware's [vRO plugin for Avi Load Balancer](https://github.com/vmware/vrealize-orchestrator-plugin-for-alb) (Build Tools xml layout) and synthetic `.package` files in vRO's on-disk format (`python3 tools/test_vro_inventory.py`).
 Element types it does not parse yet are skipped. If your export reports fewer elements than vRO shows, an issue with a redacted sample helps.
 
+## Convert with a coding agent: the `vro-to-windmill` skill
+
+[`.agents/skills/vro-to-windmill/SKILL.md`](.agents/skills/vro-to-windmill/SKILL.md) teaches a coding agent (Claude Code, Codex, Cursor, or anything that reads `AGENTS.md` / skills) to convert vRO content to Windmill, one element at a time:
+
+1. Run `vro_inventory.py --extract` so it reads actions as source files and workflows as JSON, never the raw UTF-16 XML.
+2. Write one shared helper per plugin (`VC:*` becomes a vSphere REST helper), then configuration elements as resources, then actions leaves-first, then workflows bottom-up.
+3. Apply fixed mapping tables: vRO types to script arguments, `System.*` calls to their Windmill equivalents, workflow items (task, link, decision, user interaction, foreach, timer, error path) to flow modules.
+4. Add `dry_run` to anything that changes infrastructure, preview every conversion, never invent API endpoints (it flags them `TODO(vro)` instead), and keep a conversion report.
+
+Claude Code picks it up from `.claude/skills/` when you open this repository. To use it in your own project, copy `.agents/skills/vro-to-windmill/` and `tools/vro_inventory.py` next to a `wmill init`-ed workspace, then ask: "convert the vRO export in ./exports to Windmill with the vro-to-windmill skill".
+
+[`examples/sample-vro-export/`](examples/sample-vro-export) is a small export to try it on: two vCenter actions, a configuration element, and a workflow with a decision, an approval and a loop.
+We ran the skill on it with a fresh Claude Code agent and kept the result as a worked example: the converted scripts, flow and resources are in [`f/vro/`](f/vro), and the agent's [conversion report](examples/sample-vro-export/conversion/conversion-report.md) lists every decision, `TODO(vro)` and quirk it kept.
+Feedback from that run went back into the skill.
+
 ## Setup
 
 ### 1. Workers
@@ -100,7 +115,6 @@ Element types it does not parse yet are skipped. If your export reports fewer el
 ```bash
 npm install -g windmill-cli
 wmill workspace add infra <workspace_id> https://your-windmill-host/
-wmill resource-type push c_vsphere_placement.resource-type.json   # or sync it with the rest
 wmill sync push
 ```
 

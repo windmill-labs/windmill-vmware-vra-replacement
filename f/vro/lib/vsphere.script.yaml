@@ -1,0 +1,9 @@
+summary: Shared vSphere REST helper for f/vro (replaces the vRO vCenter plugin)
+description: ''
+lock: '!inline f/vro/lib/vsphere.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties: {}
+  required: []

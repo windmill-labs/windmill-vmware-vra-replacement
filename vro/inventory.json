@@ -1,0 +1,288 @@
+[
+  {
+    "id": "8a1f0c2e-1111-4a6b-9a01-0000000000w1",
+    "type": "Workflow",
+    "name": "Clean up powered-off VMs",
+    "category": "Corp/VM",
+    "source": "examples/sample-vro-export/src/main/resources/Workflow/Corp/VM/Clean up powered-off VMs.xml",
+    "runtime": "javascript",
+    "item_types": [
+      "end",
+      "task",
+      "custom-condition",
+      "input",
+      "task"
+    ],
+    "linked_workflows": [],
+    "action_refs": [
+      "com.corp.vm/getPoweredOffVms",
+      "com.corp.vm/getPoweredOffVms",
+      "com.corp.vm/deleteVm"
+    ],
+    "plugin_types": [
+      "VC:VirtualMachine"
+    ],
+    "attributes": {},
+    "params": [
+      {
+        "kind": "input",
+        "name": "prefix",
+        "type": "string"
+      },
+      {
+        "kind": "input",
+        "name": "minDaysOff",
+        "type": "number"
+      },
+      {
+        "kind": "output",
+        "name": "deleted",
+        "type": "Array/string"
+      },
+      {
+        "kind": "attribute",
+        "name": "vms",
+        "type": "Array/VC:VirtualMachine",
+        "value": ""
+      },
+      {
+        "kind": "attribute",
+        "name": "approved",
+        "type": "boolean",
+        "value": ""
+      },
+      {
+        "kind": "attribute",
+        "name": "approver",
+        "type": "string",
+        "value": ""
+      }
+    ],
+    "items": [
+      {
+        "name": "item0",
+        "type": "end",
+        "display_name": "",
+        "next": "",
+        "alt_next": "",
+        "on_error": "",
+        "linked_workflow_id": "",
+        "action": "",
+        "in": [],
+        "out": [],
+        "script": ""
+      },
+      {
+        "name": "item1",
+        "type": "task",
+        "display_name": "getPoweredOffVms",
+        "next": "item2",
+        "alt_next": "",
+        "on_error": "",
+        "linked_workflow_id": "",
+        "action": "com.corp.vm/getPoweredOffVms",
+        "in": [
+          {
+            "name": "prefix",
+            "type": "string",
+            "from": "prefix"
+          },
+          {
+            "name": "minDaysOff",
+            "type": "number",
+            "from": "minDaysOff"
+          }
+        ],
+        "out": [
+          {
+            "name": "actionResult",
+            "type": "Array/VC:VirtualMachine",
+            "to": "vms"
+          }
+        ],
+        "script": "actionResult = System.getModule(\"com.corp.vm\").getPoweredOffVms(prefix,minDaysOff);"
+      },
+      {
+        "name": "item2",
+        "type": "custom-condition",
+        "display_name": "Anything to delete?",
+        "next": "item3",
+        "alt_next": "item0",
+        "on_error": "",
+        "linked_workflow_id": "",
+        "action": "",
+        "in": [
+          {
+            "name": "vms",
+            "type": "Array/VC:VirtualMachine",
+            "from": "vms"
+          }
+        ],
+        "out": [],
+        "script": "return vms.length > 0;"
+      },
+      {
+        "name": "item3",
+        "type": "input",
+        "display_name": "Approve deletion",
+        "next": "item4",
+        "alt_next": "",
+        "on_error": "",
+        "linked_workflow_id": "",
+        "action": "",
+        "in": [
+          {
+            "name": "vms",
+            "type": "Array/VC:VirtualMachine",
+            "from": "vms"
+          }
+        ],
+        "out": [
+          {
+            "name": "approved",
+            "type": "boolean",
+            "to": "approved"
+          },
+          {
+            "name": "approver",
+            "type": "string",
+            "to": "approver"
+          }
+        ],
+        "script": ""
+      },
+      {
+        "name": "item4",
+        "type": "task",
+        "display_name": "Delete approved VMs",
+        "next": "item0",
+        "alt_next": "",
+        "on_error": "",
+        "linked_workflow_id": "",
+        "action": "",
+        "in": [
+          {
+            "name": "vms",
+            "type": "Array/VC:VirtualMachine",
+            "from": "vms"
+          },
+          {
+            "name": "approved",
+            "type": "boolean",
+            "from": "approved"
+          },
+          {
+            "name": "approver",
+            "type": "string",
+            "from": "approver"
+          }
+        ],
+        "out": [
+          {
+            "name": "deleted",
+            "type": "Array/string",
+            "to": "deleted"
+          }
+        ],
+        "script": "deleted = [];\nif (!approved) {\n  System.warn(\"Deletion rejected by \" + approver);\n} else {\n  for (var i in vms) {\n    deleted.push(System.getModule(\"com.corp.vm\").deleteVm(vms[i]));\n  }\n}"
+      }
+    ],
+    "result_type": "",
+    "verdict": "rebuild",
+    "reason": "VC:VirtualMachine",
+    "script_lines": 10,
+    "steps": 2
+  },
+  {
+    "id": "8a1f0c2e-1111-4a6b-9a01-0000000000c1",
+    "type": "ConfigurationElement",
+    "name": "vcenter_cleanup",
+    "category": "Corp",
+    "source": "examples/sample-vro-export/src/main/resources/ConfigurationElement/Corp/vcenter_cleanup.xml",
+    "runtime": "javascript",
+    "item_types": [],
+    "linked_workflows": [],
+    "action_refs": [],
+    "plugin_types": [],
+    "attributes": {
+      "vcHost": "string",
+      "vcUser": "string",
+      "vcPassword": "SecureString",
+      "notifyEmail": "string"
+    },
+    "params": [],
+    "items": [],
+    "result_type": "",
+    "verdict": "",
+    "reason": "",
+    "script_lines": 0,
+    "steps": 0
+  },
+  {
+    "id": "8a1f0c2e-1111-4a6b-9a01-0000000000a1",
+    "type": "Action",
+    "name": "getPoweredOffVms",
+    "category": "com.corp.vm",
+    "source": "examples/sample-vro-export/src/main/resources/ScriptModule/com.corp.vm/getPoweredOffVms.xml",
+    "runtime": "javascript",
+    "item_types": [],
+    "linked_workflows": [],
+    "action_refs": [],
+    "plugin_types": [
+      "VC:VirtualMachine",
+      "VcPlugin"
+    ],
+    "attributes": {},
+    "params": [
+      {
+        "kind": "input",
+        "name": "prefix",
+        "type": "string",
+        "description": "VM name prefix, e.g. dev-"
+      },
+      {
+        "kind": "input",
+        "name": "minDaysOff",
+        "type": "number",
+        "description": "Minimum days since power off"
+      }
+    ],
+    "items": [],
+    "result_type": "Array/VC:VirtualMachine",
+    "verdict": "rebuild",
+    "reason": "VC:VirtualMachine, VcPlugin",
+    "script_lines": 14,
+    "steps": 0
+  },
+  {
+    "id": "8a1f0c2e-1111-4a6b-9a01-0000000000a2",
+    "type": "Action",
+    "name": "deleteVm",
+    "category": "com.corp.vm",
+    "source": "examples/sample-vro-export/src/main/resources/ScriptModule/com.corp.vm/deleteVm.xml",
+    "runtime": "javascript",
+    "item_types": [],
+    "linked_workflows": [],
+    "action_refs": [
+      "com.vmware.library.vc.basic/vim3WaitTaskEnd"
+    ],
+    "plugin_types": [
+      "VC:VirtualMachine"
+    ],
+    "attributes": {},
+    "params": [
+      {
+        "kind": "input",
+        "name": "vm",
+        "type": "VC:VirtualMachine",
+        "description": "VM to destroy"
+      }
+    ],
+    "items": [],
+    "result_type": "string",
+    "verdict": "rebuild",
+    "reason": "VC:VirtualMachine",
+    "script_lines": 8,
+    "steps": 0
+  }
+]

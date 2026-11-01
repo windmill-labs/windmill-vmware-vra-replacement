@@ -1,0 +1,180 @@
+{
+  "type": "Workflow",
+  "id": "8a1f0c2e-1111-4a6b-9a01-0000000000w1",
+  "name": "Clean up powered-off VMs",
+  "category": "Corp/VM",
+  "verdict": "rebuild",
+  "reason": "VC:VirtualMachine",
+  "plugin_types": [
+    "VC:VirtualMachine"
+  ],
+  "params": [
+    {
+      "kind": "input",
+      "name": "prefix",
+      "type": "string"
+    },
+    {
+      "kind": "input",
+      "name": "minDaysOff",
+      "type": "number"
+    },
+    {
+      "kind": "output",
+      "name": "deleted",
+      "type": "Array/string"
+    },
+    {
+      "kind": "attribute",
+      "name": "vms",
+      "type": "Array/VC:VirtualMachine",
+      "value": ""
+    },
+    {
+      "kind": "attribute",
+      "name": "approved",
+      "type": "boolean",
+      "value": ""
+    },
+    {
+      "kind": "attribute",
+      "name": "approver",
+      "type": "string",
+      "value": ""
+    }
+  ],
+  "items": [
+    {
+      "name": "item0",
+      "type": "end",
+      "display_name": "",
+      "next": "",
+      "alt_next": "",
+      "on_error": "",
+      "linked_workflow_id": "",
+      "action": "",
+      "in": [],
+      "out": [],
+      "script": ""
+    },
+    {
+      "name": "item1",
+      "type": "task",
+      "display_name": "getPoweredOffVms",
+      "next": "item2",
+      "alt_next": "",
+      "on_error": "",
+      "linked_workflow_id": "",
+      "action": "com.corp.vm/getPoweredOffVms",
+      "in": [
+        {
+          "name": "prefix",
+          "type": "string",
+          "from": "prefix"
+        },
+        {
+          "name": "minDaysOff",
+          "type": "number",
+          "from": "minDaysOff"
+        }
+      ],
+      "out": [
+        {
+          "name": "actionResult",
+          "type": "Array/VC:VirtualMachine",
+          "to": "vms"
+        }
+      ],
+      "script": "actionResult = System.getModule(\"com.corp.vm\").getPoweredOffVms(prefix,minDaysOff);"
+    },
+    {
+      "name": "item2",
+      "type": "custom-condition",
+      "display_name": "Anything to delete?",
+      "next": "item3",
+      "alt_next": "item0",
+      "on_error": "",
+      "linked_workflow_id": "",
+      "action": "",
+      "in": [
+        {
+          "name": "vms",
+          "type": "Array/VC:VirtualMachine",
+          "from": "vms"
+        }
+      ],
+      "out": [],
+      "script": "return vms.length > 0;"
+    },
+    {
+      "name": "item3",
+      "type": "input",
+      "display_name": "Approve deletion",
+      "next": "item4",
+      "alt_next": "",
+      "on_error": "",
+      "linked_workflow_id": "",
+      "action": "",
+      "in": [
+        {
+          "name": "vms",
+          "type": "Array/VC:VirtualMachine",
+          "from": "vms"
+        }
+      ],
+      "out": [
+        {
+          "name": "approved",
+          "type": "boolean",
+          "to": "approved"
+        },
+        {
+          "name": "approver",
+          "type": "string",
+          "to": "approver"
+        }
+      ],
+      "script": ""
+    },
+    {
+      "name": "item4",
+      "type": "task",
+      "display_name": "Delete approved VMs",
+      "next": "item0",
+      "alt_next": "",
+      "on_error": "",
+      "linked_workflow_id": "",
+      "action": "",
+      "in": [
+        {
+          "name": "vms",
+          "type": "Array/VC:VirtualMachine",
+          "from": "vms"
+        },
+        {
+          "name": "approved",
+          "type": "boolean",
+          "from": "approved"
+        },
+        {
+          "name": "approver",
+          "type": "string",
+          "from": "approver"
+        }
+      ],
+      "out": [
+        {
+          "name": "deleted",
+          "type": "Array/string",
+          "to": "deleted"
+        }
+      ],
+      "script": "deleted = [];\nif (!approved) {\n  System.warn(\"Deletion rejected by \" + approver);\n} else {\n  for (var i in vms) {\n    deleted.push(System.getModule(\"com.corp.vm\").deleteVm(vms[i]));\n  }\n}"
+    }
+  ],
+  "action_refs": [
+    "com.corp.vm/getPoweredOffVms",
+    "com.corp.vm/getPoweredOffVms",
+    "com.corp.vm/deleteVm"
+  ]
+}

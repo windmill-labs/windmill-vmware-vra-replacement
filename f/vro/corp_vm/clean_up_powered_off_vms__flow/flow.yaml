@@ -1,0 +1,132 @@
+summary: Clean up powered-off VMs (converted from vRO Corp/VM)
+description: >
+  Converted from the vRO workflow "Clean up powered-off VMs" (category Corp/VM,
+  id 8a1f0c2e-1111-4a6b-9a01-0000000000w1).
+
+    get_powered_off_vms   item1  action com.corp.vm/getPoweredOffVms
+    anything_to_delete    item2  decision "Anything to delete?" (false path: end)
+      approve_deletion    item3  user interaction "Approve deletion"
+      delete_approved_vms item4  scriptable task "Delete approved VMs"
+    workflow_outputs             the workflow output `deleted`
+
+  Set dry_run to skip the deletions; listing VMs still calls vCenter.
+value:
+  modules:
+    - id: get_powered_off_vms
+      summary: getPoweredOffVms
+      value:
+        type: script
+        input_transforms:
+          minDaysOff:
+            type: javascript
+            expr: flow_input.minDaysOff
+          prefix:
+            type: javascript
+            expr: flow_input.prefix
+          vsphere:
+            type: javascript
+            expr: flow_input.vsphere
+        path: f/vro/com_corp_vm/get_powered_off_vms
+    - id: anything_to_delete
+      summary: Anything to delete?
+      value:
+        type: branchone
+        branches:
+          - summary: VMs found
+            modules:
+              - id: approve_deletion
+                summary: Approve deletion
+                value:
+                  type: rawscript
+                  content: '!inline approve_deletion.ts'
+                  input_transforms:
+                    vms:
+                      type: javascript
+                      expr: results.get_powered_off_vms
+                  lock: '!inline approve_deletion.lock'
+                  language: bun
+                suspend:
+                  required_events: 1
+                  resume_form:
+                    schema:
+                      type: object
+                      order:
+                        - approved
+                        - approver
+                      properties:
+                        approved:
+                          type: boolean
+                          description: Approve the deletion of the listed VMs
+                        approver:
+                          type: string
+                          description: Your name
+                      required:
+                        - approved
+                        - approver
+              - id: delete_approved_vms
+                summary: Delete approved VMs
+                value:
+                  type: rawscript
+                  content: '!inline delete_approved_vms.ts'
+                  input_transforms:
+                    approved:
+                      type: javascript
+                      expr: resume.approved === true
+                    approver:
+                      type: javascript
+                      expr: resume.approver
+                    dry_run:
+                      type: javascript
+                      expr: flow_input.dry_run === true
+                    vms:
+                      type: javascript
+                      expr: results.get_powered_off_vms
+                    vsphere:
+                      type: javascript
+                      expr: flow_input.vsphere
+                  lock: '!inline delete_approved_vms.lock'
+                  language: bun
+            expr: results.get_powered_off_vms.length > 0
+            parallel: true
+            skip_failure: false
+        default: []
+    - id: workflow_outputs
+      summary: Workflow output `deleted`
+      value:
+        type: rawscript
+        content: '!inline workflow_outputs.ts'
+        input_transforms:
+          deleted:
+            type: javascript
+            expr: 'results.get_powered_off_vms.length > 0 ? results.anything_to_delete :
+              null'
+        lock: '!inline workflow_outputs.lock'
+        language: bun
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  order:
+    - prefix
+    - minDaysOff
+    - vsphere
+    - dry_run
+  properties:
+    dry_run:
+      type: boolean
+      description: Log the deletions instead of running them
+      default: false
+    minDaysOff:
+      type: number
+      description: Minimum days since power off
+    prefix:
+      type: string
+      description: VM name prefix, e.g. dev-
+    vsphere:
+      type: object
+      description: vCenter connection (replaces the vRO vCenter plugin)
+      default: $res:f/vro/vsphere
+      format: resource-vmware_vsphere
+  required:
+    - prefix
+    - minDaysOff
+    - vsphere

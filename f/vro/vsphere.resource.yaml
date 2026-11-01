@@ -1,0 +1,9 @@
+value:
+  server: vcenter.corp.local
+  username: svc-vro@vsphere.local
+  password: ''
+  allow_unverified_ssl: false
+description: 'vCenter connection replacing the vRO vCenter plugin (VC:* / VcPlugin) for f/vro scripts. Server and user come
+  from the vRO configuration element Corp/vcenter_cleanup (vcHost, vcUser). Fill the password in Windmill: it was a SecureString
+  in vRO.'
+resource_type: vmware_vsphere

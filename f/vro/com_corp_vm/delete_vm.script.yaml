@@ -1,0 +1,25 @@
+summary: 'vRO action com.corp.vm/deleteVm: delete a powered-off VM'
+description: ''
+lock: '!inline f/vro/com_corp_vm/delete_vm.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    dry_run:
+      type: boolean
+      description: ''
+      default: false
+    vm:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    vsphere:
+      type: object
+      description: ''
+      default: null
+      format: resource-vmware_vsphere
+  required:
+    - vsphere
+    - vm

@@ -69,6 +69,8 @@ class Element:
     params: list[dict] = field(default_factory=list)    # inputs, outputs, attributes with types
     items: list[dict] = field(default_factory=list)     # workflow steps in document order
     result_type: str = ""
+    description: str = ""
+    start: str = ""                                     # workflow start item (root-name)
     verdict: str = ""
     reason: str = ""
 
@@ -155,6 +157,8 @@ def element_from_xml(root: ET.Element, *, elem_id: str = "", elem_type: str = ""
             name=(root.findtext("display-name") or root.get("name") or elem_id).strip(),
             category=category,
             source=source,
+            description=(root.findtext("description") or "").strip(),
+            start=root.get("root-name", ""),
         )
         for kind, tag_name in (("input", "input"), ("output", "output")):
             section = root.find(tag_name)
@@ -203,6 +207,7 @@ def element_from_xml(root: ET.Element, *, elem_id: str = "", elem_type: str = ""
             source=source,
             runtime=runtime,
             result_type=root.get("result-type", ""),
+            description=(root.findtext("description") or "").strip(),
         )
         for prm in root.findall("param"):
             el.params.append({"kind": "input", "name": prm.get("n", ""), "type": prm.get("t", ""),
@@ -399,6 +404,16 @@ def report(elements: list[Element], runs_given: bool, since_days: int) -> str:
         out += ["", "## Plugin dependencies", "", "Each plugin is an integration to replace once and share across scripts.", ""]
         out.append(md_table(["Plugin type / object", "Used by"], [[p, n] for p, n in plugins.most_common()]))
 
+    known = set()
+    for a in acts:
+        known.add(f"{a.category}/{a.name}")
+    missing = sorted({r for e in wfs + acts for r in e.action_refs if r not in known})
+    if missing:
+        out += ["", "## Referenced but not in this export", "",
+                "Actions called by the content above that the export doesn't contain: VMware library actions (`com.vmware.library.*`) or another package. "
+                "Replace each with its Windmill equivalent, or export the package that holds it.", ""]
+        out += [f"- `{r}`" for r in missing]
+
     for title, items in (("Workflows", wfs), ("Actions", acts)):
         if not items:
             continue
@@ -438,7 +453,9 @@ def extract(elements: list[Element], out: Path) -> int:
             ext = EXT.get(e.runtime, "js")
             c = COMMENT[ext]
             path = out / "actions" / cat / f"{_safe(e.name)}.{ext}"
-            header = [f"{c} vRO action: {e.category}/{e.name}", f"{c} id: {e.id}", f"{c} runtime: {e.runtime}",
+            header = [f"{c} vRO action: {e.category}/{e.name}", f"{c} id: {e.id}"]
+            header += [f"{c} description: {line}" for line in e.description.splitlines() if line.strip()]
+            header += [f"{c} runtime: {e.runtime}",
                       f"{c} returns: {e.result_type or 'void'}"]
             header += [f"{c} param {p['name']}: {p['type']}" + (f"  ({p['description']})" if p.get("description") else "") for p in e.params]
             header += [f"{c} verdict: {e.verdict} ({e.reason})", ""]
@@ -449,7 +466,8 @@ def extract(elements: list[Element], out: Path) -> int:
             doc = {"type": e.type, "id": e.id, "name": e.name, "category": e.category, "verdict": e.verdict,
                    "reason": e.reason, "plugin_types": sorted(e.plugin_types)}
             if e.type == "Workflow":
-                doc.update({"params": e.params, "items": e.items, "action_refs": e.action_refs})
+                doc.update({"description": e.description, "start": e.start, "params": e.params,
+                            "items": e.items, "action_refs": e.action_refs})
             else:
                 doc["attributes"] = e.attributes
             header, body = [], json.dumps(doc, indent=2)
@@ -489,6 +507,9 @@ def main(argv: list[str] | None = None) -> int:
     runs = load_runs(args.runs) if args.runs else None
     classify(elements, runs, args.since_days)
     md = report(elements, runs is not None, args.since_days)
+    for target in (args.out, args.json):
+        if target:
+            target.parent.mkdir(parents=True, exist_ok=True)
     if args.out:
         args.out.write_text(md)
     else:

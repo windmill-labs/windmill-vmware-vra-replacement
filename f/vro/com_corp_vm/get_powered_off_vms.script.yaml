@@ -1,0 +1,26 @@
+summary: 'vRO action com.corp.vm/getPoweredOffVms: list powered-off VMs by name prefix'
+description: ''
+lock: '!inline f/vro/com_corp_vm/get_powered_off_vms.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    minDaysOff:
+      type: number
+      description: ''
+      default: null
+    prefix:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    vsphere:
+      type: object
+      description: ''
+      default: null
+      format: resource-vmware_vsphere
+  required:
+    - vsphere
+    - prefix
+    - minDaysOff

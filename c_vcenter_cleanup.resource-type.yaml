@@ -1,0 +1,12 @@
+description: Settings from the vRO configuration element Corp/vcenter_cleanup (id 8a1f0c2e-1111-4a6b-9a01-0000000000c1). Its
+  vCenter credentials moved to the vmware_vsphere resource f/vro/vsphere.
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  order:
+  - notifyEmail
+  required: []
+  properties:
+    notifyEmail:
+      type: string
+      description: vRO attribute notifyEmail (string)

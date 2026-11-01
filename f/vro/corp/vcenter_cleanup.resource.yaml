@@ -1,0 +1,5 @@
+value:
+  notifyEmail: infra-team@corp.local
+description: Settings from vRO configuration element Corp/vcenter_cleanup. Its vcHost / vcUser / vcPassword attributes are
+  the vmware_vsphere resource f/vro/vsphere.
+resource_type: c_vcenter_cleanup

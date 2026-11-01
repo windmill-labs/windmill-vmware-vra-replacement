@@ -1,0 +1,15 @@
+{
+  "type": "ConfigurationElement",
+  "id": "8a1f0c2e-1111-4a6b-9a01-0000000000c1",
+  "name": "vcenter_cleanup",
+  "category": "Corp",
+  "verdict": "",
+  "reason": "",
+  "plugin_types": [],
+  "attributes": {
+    "vcHost": "string",
+    "vcUser": "string",
+    "vcPassword": "SecureString",
+    "notifyEmail": "string"
+  }
+}
