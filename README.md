@@ -47,7 +47,7 @@ provision_vm
 | Approval policy | `approval` step with `suspend`, `skip_if` decides when it applies |
 | Workflow | Flow (`flow.yaml`) |
 | Action (JavaScript) | Script (`.ts`, `.py`, `.ps1`, `.sh`...) |
-| Configuration element | Resource or variable (`f/infra/vsphere`, `f/infra/ssh_private_key`) |
+| Configuration element | Resource or variable (`f/infra/vsphere`, `f/infra/vsphere_placement`, `f/infra/ssh_private_key`) |
 | SecureString | Secret variable, or a secret field in a resource |
 | Policy / scheduled workflow | Schedule (`*.schedule.yaml`) |
 | Event subscription | Webhook, HTTP route, Kafka, NATS, SQS, MQTT, Postgres CDC or email trigger with a preprocessor |
@@ -100,7 +100,7 @@ Element types it does not parse yet are skipped. If your export reports fewer el
 ```bash
 npm install -g windmill-cli
 wmill workspace add infra <workspace_id> https://your-windmill-host/
-wmill resource-type push c_vsphere.resource-type.json   # or sync it with the rest
+wmill resource-type push c_vsphere_placement.resource-type.json   # or sync it with the rest
 wmill sync push
 ```
 
@@ -110,7 +110,8 @@ Create these in the workspace (UI or `wmill sync`):
 
 | Path | Type | Notes |
 | --- | --- | --- |
-| `f/infra/vsphere` | `c_vsphere` | vCenter, service account, datacenter, cluster, datastore, port group, folder, DNS domain |
+| `f/infra/vsphere` | `vmware_vsphere` (from the Hub) | vCenter host, SSO user and password |
+| `f/infra/vsphere_placement` | `c_vsphere_placement` (this repo) | Datacenter, cluster, datastore, port group, folder and DNS domain for new VMs |
 | `f/infra/tf_state` | `postgresql` | Any Postgres the workers reach. OpenTofu creates the `windmill_vsphere_vms` schema |
 | `f/infra/servicenow` | `servicenow` | Basic auth or the ServiceNow OAuth connection |
 | `f/infra/ssh_private_key` | secret variable | Matches the key in the templates' `authorized_keys`. Keep the trailing newline |
@@ -131,7 +132,7 @@ wmill flow preview f/infra/provision_vm__flow --step plan \
 wmill script preview f/infra/cert_expiry_check.ts -d '{"endpoints":["www.windmill.dev:443"],"warn_days":21}'
 ```
 
-`provision_vm` and `decommission_vm` in dry run still resolve `f/infra/vsphere` and `f/infra/tf_state`, so create those resources first (placeholder values are fine in dry run).
+`provision_vm` and `decommission_vm` in dry run still resolve `f/infra/vsphere`, `f/infra/vsphere_placement` and `f/infra/tf_state`, so create those resources first (placeholder values are fine in dry run).
 
 ## Start provisioning from ServiceNow
 

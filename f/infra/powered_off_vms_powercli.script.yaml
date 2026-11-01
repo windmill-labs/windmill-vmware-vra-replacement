@@ -1,4 +1,4 @@
-summary: 'List powered-off VMs by name prefix with PowerCLI'
+summary: List powered-off VMs by name prefix with PowerCLI
 description: ''
 lock: ''
 kind: script

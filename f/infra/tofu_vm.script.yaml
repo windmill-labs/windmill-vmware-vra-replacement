@@ -1,4 +1,4 @@
-summary: 'Create or destroy a vSphere VM with OpenTofu (state in Postgres)'
+summary: Create or destroy a vSphere VM with OpenTofu (state in Postgres)
 description: ''
 lock: '!inline f/infra/tofu_vm.script.lock'
 kind: script
@@ -30,6 +30,11 @@ schema:
       type: integer
       description: ''
       default: 4096
+    placement:
+      type: object
+      description: ''
+      default: null
+      format: resource-c_vsphere_placement
     template:
       type: string
       description: ''
@@ -49,9 +54,10 @@ schema:
       type: object
       description: ''
       default: null
-      format: resource-c_vsphere
+      format: resource-vmware_vsphere
   required:
     - action
     - vm_name
     - vsphere
+    - placement
     - tf_state

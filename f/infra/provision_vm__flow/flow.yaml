@@ -79,6 +79,9 @@ value:
           memory_mb:
             type: javascript
             expr: results.plan.memory_mb
+          placement:
+            type: static
+            value: $res:f/infra/vsphere_placement
           template:
             type: javascript
             expr: results.plan.template

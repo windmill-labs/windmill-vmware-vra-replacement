@@ -15,9 +15,9 @@ from pyVim.task import WaitForTask
 from pyVmomi import vim
 
 
-class c_vsphere(TypedDict):
+class vmware_vsphere(TypedDict):
     server: str
-    user: str
+    username: str
     password: str
     allow_unverified_ssl: bool
 
@@ -29,7 +29,7 @@ def _walk(tree, vm_name, out):
 
 
 def main(
-    vsphere: c_vsphere,
+    vsphere: vmware_vsphere,
     max_age_days: int = 7,
     keep_if_name_contains: str = "keep",
     dry_run: bool = True,
@@ -39,7 +39,7 @@ def main(
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
 
-    si = SmartConnect(host=vsphere["server"], user=vsphere["user"], pwd=vsphere["password"], sslContext=ctx)
+    si = SmartConnect(host=vsphere["server"], user=vsphere["username"], pwd=vsphere["password"], sslContext=ctx)
     try:
         content = si.RetrieveContent()
         view = content.viewManager.CreateContainerView(content.rootFolder, [vim.VirtualMachine], True)

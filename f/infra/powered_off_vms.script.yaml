@@ -1,4 +1,4 @@
-summary: 'List powered-off VMs by name prefix (vRO action ported to the vSphere REST API)'
+summary: List powered-off VMs by name prefix (vRO action ported to the vSphere REST API)
 description: ''
 lock: '!inline f/infra/powered_off_vms.script.lock'
 kind: script
@@ -15,7 +15,7 @@ schema:
       type: object
       description: ''
       default: null
-      format: resource-c_vsphere
+      format: resource-vmware_vsphere
       properties:
         password:
           type: string
@@ -25,7 +25,7 @@ schema:
           type: string
           description: ''
           originalType: string
-        user:
+        username:
           type: string
           description: ''
           originalType: string

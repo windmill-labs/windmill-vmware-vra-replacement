@@ -10,20 +10,20 @@
 //   return result;
 //
 // The vCenter plugin object becomes a call to the vSphere Automation REST API
-// (vCenter 7.0 U2 and later), and the configuration element becomes a typed resource.
+// (vCenter 7.0 U2 and later), and the configuration element becomes a vmware_vsphere resource.
 
-type CVsphere = {
+type VmwareVsphere = {
   server: string;
-  user: string;
+  username: string;
   password: string;
 };
 
-export async function main(vsphere: CVsphere, prefix: string = "") {
+export async function main(vsphere: VmwareVsphere, prefix: string = "") {
   const base = `https://${vsphere.server}/api`;
 
   const session = await fetch(`${base}/session`, {
     method: "POST",
-    headers: { Authorization: `Basic ${btoa(`${vsphere.user}:${vsphere.password}`)}` },
+    headers: { Authorization: `Basic ${btoa(`${vsphere.username}:${vsphere.password}`)}` },
   });
   if (!session.ok) throw new Error(`vCenter login failed: ${session.status}`);
   const token: string = await session.json();

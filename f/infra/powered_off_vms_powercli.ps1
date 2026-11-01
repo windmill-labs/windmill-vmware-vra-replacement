@@ -11,7 +11,7 @@ Import-Module VMware.VimAutomation.Core
 Set-PowerCLIConfiguration -Scope Session -ParticipateInCEIP $false -InvalidCertificateAction Warn -Confirm:$false | Out-Null
 
 $cred = New-Object System.Management.Automation.PSCredential(
-    $Vsphere.user, (ConvertTo-SecureString $Vsphere.password -AsPlainText -Force))
+    $Vsphere.username, (ConvertTo-SecureString $Vsphere.password -AsPlainText -Force))
 $server = Connect-VIServer -Server $Vsphere.server -Credential $cred
 
 try {
