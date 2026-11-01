@@ -23,6 +23,8 @@ It runs on the open source Community Edition; the [Enterprise Edition](https://w
 | `servicenow_update.ts` | Script | Work note and state change on any ServiceNow table, basic auth or OAuth. |
 | `snapshot_sweeper.py` | Script + schedule | Deletes vSphere snapshots older than N days (pyvmomi). Dry run by default. |
 | `cert_expiry_check.ts` | Script + schedule | Fails when a TLS certificate expires within N days, so the schedule error handler alerts. |
+| `powered_off_vms.ts` | Script | A typical vRO action ported to TypeScript on the vSphere Automation REST API. The original JavaScript is in the header comment. |
+| `powered_off_vms_powercli.ps1` | Script | The same action with PowerCLI. Windmill installs the module from the PowerShell Gallery on first run. |
 | `*.schedule.yaml` | Schedules | Nightly snapshot sweep, daily certificate check, weekly rolling patch. All ship disabled. |
 
 ```
@@ -45,11 +47,38 @@ provision_vm
 | Approval policy | `approval` step with `suspend`, `skip_if` decides when it applies |
 | Workflow | Flow (`flow.yaml`) |
 | Action (JavaScript) | Script (`.ts`, `.py`, `.ps1`, `.sh`...) |
-| Configuration element | Resource or variable (`f/infra/vsphere`, `f/infra/ssh_private_key`) |
+| Configuration element | Resource or variable (`f/infra/vsphere`, `f/infra/vsphere_placement`, `f/infra/ssh_private_key`) |
 | SecureString | Secret variable, or a secret field in a resource |
 | Policy / scheduled workflow | Schedule (`*.schedule.yaml`) |
 | Event subscription | Webhook, HTTP route, Kafka, NATS, SQS, MQTT, Postgres CDC or email trigger with a preprocessor |
 | Package export | Git, synced with `wmill sync` |
+
+## Size your migration: `tools/vro_inventory.py`
+
+A standalone script (Python 3.9+, standard library only) that reads a vRO export and sorts every workflow and action into retire, merge, wrapper, rebuild or convert, with the plugin dependencies to replace.
+It runs on your machine, and nothing is sent anywhere.
+
+```bash
+# .package files from the vRO client or Build Tools for VMware Aria,
+# extracted package directories, or a Build Tools "xml" project
+python3 tools/vro_inventory.py exports/*.package --out inventory.md --json inventory.json
+
+# add run history to find workflows nobody ran in a year
+python3 tools/vro_inventory.py exports/ --runs runs.csv --since-days 365
+```
+
+`runs.csv` has a column `id` or `name`, and `last_run` (ISO 8601, empty when never run). You can build it from the vRO REST API (`GET /vco/api/workflows/{id}/executions`).
+
+| Verdict | Meaning | Becomes in Windmill |
+| --- | --- | --- |
+| retire | Not run in the window (needs `--runs`), or an action nothing references | Nothing |
+| merge | Same steps and logic as another workflow, ignoring literals | One flow with an input for what differs |
+| wrapper | One meaningful step | One script, or a direct call to the tool |
+| rebuild | Uses plugin objects (`VC:`, `AD:`, `REST:`, `VcPlugin`...) | Script on the target's API or SDK |
+| convert | Plain logic | TypeScript, Python or PowerShell script; flow when multi-step |
+
+Tested against the workflows and actions of VMware's [vRO plugin for Avi Load Balancer](https://github.com/vmware/vrealize-orchestrator-plugin-for-alb) (Build Tools xml layout) and synthetic `.package` files in vRO's on-disk format (`python3 tools/test_vro_inventory.py`).
+Element types it does not parse yet are skipped. If your export reports fewer elements than vRO shows, an issue with a redacted sample helps.
 
 ## Setup
 
@@ -71,7 +100,7 @@ provision_vm
 ```bash
 npm install -g windmill-cli
 wmill workspace add infra <workspace_id> https://your-windmill-host/
-wmill resource-type push c_vsphere.resource-type.json   # or sync it with the rest
+wmill resource-type push c_vsphere_placement.resource-type.json   # or sync it with the rest
 wmill sync push
 ```
 
@@ -81,7 +110,8 @@ Create these in the workspace (UI or `wmill sync`):
 
 | Path | Type | Notes |
 | --- | --- | --- |
-| `f/infra/vsphere` | `c_vsphere` | vCenter, service account, datacenter, cluster, datastore, port group, folder, DNS domain |
+| `f/infra/vsphere` | `vmware_vsphere` (from the Hub) | vCenter host, SSO user and password |
+| `f/infra/vsphere_placement` | `c_vsphere_placement` (this repo) | Datacenter, cluster, datastore, port group, folder and DNS domain for new VMs |
 | `f/infra/tf_state` | `postgresql` | Any Postgres the workers reach. OpenTofu creates the `windmill_vsphere_vms` schema |
 | `f/infra/servicenow` | `servicenow` | Basic auth or the ServiceNow OAuth connection |
 | `f/infra/ssh_private_key` | secret variable | Matches the key in the templates' `authorized_keys`. Keep the trailing newline |
@@ -102,7 +132,7 @@ wmill flow preview f/infra/provision_vm__flow --step plan \
 wmill script preview f/infra/cert_expiry_check.ts -d '{"endpoints":["www.windmill.dev:443"],"warn_days":21}'
 ```
 
-`provision_vm` and `decommission_vm` in dry run still resolve `f/infra/vsphere` and `f/infra/tf_state`, so create those resources first (placeholder values are fine in dry run).
+`provision_vm` and `decommission_vm` in dry run still resolve `f/infra/vsphere`, `f/infra/vsphere_placement` and `f/infra/tf_state`, so create those resources first (placeholder values are fine in dry run).
 
 ## Start provisioning from ServiceNow
 

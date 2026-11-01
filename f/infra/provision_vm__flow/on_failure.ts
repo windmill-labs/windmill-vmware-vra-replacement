@@ -21,6 +21,7 @@ export async function main(
       action: "destroy",
       vm_name,
       vsphere: "$res:f/infra/vsphere",
+      placement: "$res:f/infra/vsphere_placement",
       tf_state: "$res:f/infra/tf_state",
       dry_run,
     });

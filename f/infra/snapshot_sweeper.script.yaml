@@ -1,4 +1,4 @@
-summary: 'Delete vSphere snapshots older than N days'
+summary: Delete vSphere snapshots older than N days
 description: ''
 lock: '!inline f/infra/snapshot_sweeper.script.lock'
 kind: script
@@ -23,6 +23,6 @@ schema:
       type: object
       description: ''
       default: null
-      format: resource-c_vsphere
+      format: resource-vmware_vsphere
   required:
     - vsphere

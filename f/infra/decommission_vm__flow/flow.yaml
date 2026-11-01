@@ -45,6 +45,9 @@ value:
           vsphere:
             type: static
             value: $res:f/infra/vsphere
+          placement:
+            type: static
+            value: $res:f/infra/vsphere_placement
         path: f/infra/tofu_vm
     - id: close_ticket
       summary: Record the decommission on the ticket

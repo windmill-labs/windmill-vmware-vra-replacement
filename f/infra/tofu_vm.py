@@ -17,11 +17,14 @@ import urllib.parse
 from typing import Literal, TypedDict
 
 
-class c_vsphere(TypedDict):
+class vmware_vsphere(TypedDict):
     server: str
-    user: str
+    username: str
     password: str
     allow_unverified_ssl: bool
+
+
+class c_vsphere_placement(TypedDict):
     datacenter: str
     cluster: str
     datastore: str
@@ -172,7 +175,8 @@ def _run(binary: str, args: list[str], cwd: str, env: dict, capture: bool = Fals
 def main(
     action: Literal["apply", "destroy"],
     vm_name: str,
-    vsphere: c_vsphere,
+    vsphere: vmware_vsphere,
+    placement: c_vsphere_placement,
     tf_state: postgresql,
     template: str = "ubuntu-24.04-template",
     cpus: int = 2,
@@ -212,15 +216,15 @@ def main(
         "PG_CONN_STR": _pg_conn_str(tf_state),
         "PG_SCHEMA_NAME": "windmill_vsphere_vms",
         "TF_VAR_vsphere_server": vsphere["server"],
-        "TF_VAR_vsphere_user": vsphere["user"],
+        "TF_VAR_vsphere_user": vsphere["username"],
         "TF_VAR_vsphere_password": vsphere["password"],
         "TF_VAR_allow_unverified_ssl": json.dumps(bool(vsphere.get("allow_unverified_ssl", False))),
-        "TF_VAR_datacenter": vsphere["datacenter"],
-        "TF_VAR_cluster": vsphere["cluster"],
-        "TF_VAR_datastore": vsphere["datastore"],
-        "TF_VAR_network": vsphere["network"],
-        "TF_VAR_folder": vsphere.get("folder") or "",
-        "TF_VAR_domain": vsphere.get("domain") or "corp.local",
+        "TF_VAR_datacenter": placement["datacenter"],
+        "TF_VAR_cluster": placement["cluster"],
+        "TF_VAR_datastore": placement["datastore"],
+        "TF_VAR_network": placement["network"],
+        "TF_VAR_folder": placement.get("folder") or "",
+        "TF_VAR_domain": placement.get("domain") or "corp.local",
         "TF_VAR_template": template,
         "TF_VAR_vm_name": vm_name,
         "TF_VAR_cpus": str(cpus),
